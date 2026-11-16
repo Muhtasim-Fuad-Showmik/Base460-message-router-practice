@@ -4,8 +4,9 @@ from http import HTTPStatus
 from fastapi import APIRouter
 
 from message_router.api.deps import MessageServiceDep, PaginationDep
-from message_router.models import GuestMessage, MessageIntent, MessageStatus
+from message_router.models import AutomatedResponse, GuestMessage, MessageIntent, MessageStatus
 from message_router.schemas.message import MessageCreate, MessageDetail, MessageRead
+from message_router.schemas.response import AutomatedResponseCreate, AutomatedResponseRead
 
 router = APIRouter(prefix="/messages", tags=["messages"])
 
@@ -38,6 +39,24 @@ def list_messages(
 def get_message(message_id: uuid.UUID, service: MessageServiceDep) -> GuestMessage:
     """Get a single message with its property and responses."""
     return service.get_detail(message_id)
+
+
+@router.post(
+    "/{message_id}/respond", response_model=AutomatedResponseRead, status_code=HTTPStatus.CREATED
+)
+def respond_to_message(
+    message_id: uuid.UUID, data: AutomatedResponseCreate, service: MessageServiceDep
+) -> AutomatedResponse:
+    """Create an automated response and mark the message `responded` (409 once escalated)."""
+    return service.respond(message_id, data)
+
+
+@router.post(
+    "/{message_id}/escalate", response_model=AutomatedResponseRead, status_code=HTTPStatus.CREATED
+)
+def escalate_message(message_id: uuid.UUID, service: MessageServiceDep) -> AutomatedResponse:
+    """Escalate a message: store an `escalation_notice` and mark it `escalated`."""
+    return service.escalate(message_id)
 
 
 @router.patch("/{message_id}/classify", response_model=MessageRead)

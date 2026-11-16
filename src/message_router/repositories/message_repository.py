@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Collection
 from typing import Any, cast
 
-from sqlalchemy import CursorResult, select, update
+from sqlalchemy import CursorResult, exists, select, update
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from message_router.models import GuestMessage, MessageIntent, MessageStatus
@@ -19,6 +19,10 @@ class MessageRepository:
 
     def get(self, message_id: uuid.UUID) -> GuestMessage | None:
         return self._session.get(GuestMessage, message_id)
+
+    def exists(self, message_id: uuid.UUID) -> bool:
+        statement = select(exists().where(GuestMessage.id == message_id))
+        return bool(self._session.scalar(statement))
 
     def get_with_property_and_responses(self, message_id: uuid.UUID) -> GuestMessage | None:
         statement = (
