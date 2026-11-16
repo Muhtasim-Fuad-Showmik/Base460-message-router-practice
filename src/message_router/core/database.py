@@ -1,7 +1,8 @@
 from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import DateTime, Engine, create_engine, event
+from sqlalchemy import DateTime, Engine, Enum, create_engine, event
 from sqlalchemy.engine.interfaces import Dialect
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.types import TypeDecorator
@@ -29,6 +30,16 @@ class UtcDateTime(TypeDecorator[datetime]):
 
     def process_result_value(self, value: datetime | None, dialect: Dialect) -> datetime | None:
         return None if value is None else value.replace(tzinfo=UTC)
+
+
+def enum_column[E: StrEnum](enum_class: type[E]) -> Enum:
+    """Portable string-backed enum column that stores the enum *values*."""
+    return Enum(
+        enum_class,
+        native_enum=False,
+        length=32,
+        values_callable=lambda members: [member.value for member in members],
+    )
 
 
 def create_db_engine(url: str) -> Engine:
