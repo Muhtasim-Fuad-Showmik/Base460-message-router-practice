@@ -36,6 +36,7 @@ Definition of done for any change: `uv run ruff check .`, `uv run mypy src` and 
 - Time goes through `src/message_router/core/clock.py`; never call `datetime.now()` elsewhere.
 - Type-hint everything (mypy strict-ish), SQLAlchemy 2.0 style (`Mapped[...]`, `select()`), no legacy `Query`.
 - Tests assert behaviour through the public API (HTTP) or a pure function — not private helpers.
+- **Never commit without the user's approval.** When a slice is ready, stop and ask the user to review it first; commit only after they approve. Staging is fine, committing is not.
 - Use the `commit` skill for commits: conventional commits, small and frequent (the assignment reviews history).
 
 ## Docs
