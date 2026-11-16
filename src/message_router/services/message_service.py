@@ -14,7 +14,7 @@ from message_router.models import (
 from message_router.repositories.message_repository import MessageRepository
 from message_router.repositories.property_repository import PropertyRepository
 from message_router.repositories.response_repository import ResponseRepository
-from message_router.schemas.message import MessageCreate
+from message_router.schemas.message import MessageCreate, MessageStatusSummary
 from message_router.schemas.response import AutomatedResponseCreate
 from message_router.services import classifier
 from message_router.services.transitions import TRANSITIONS, MessageAction
@@ -47,7 +47,7 @@ class MessageService:
             raise _message_not_found(message_id)
         return message
 
-    def list(
+    def list_messages(
         self,
         *,
         property_id: uuid.UUID | None,
@@ -59,6 +59,24 @@ class MessageService:
         return self._messages.list(
             property_id=property_id, status=status, intent=intent, skip=skip, limit=limit
         )
+
+    def list_for_property(
+        self, property_id: uuid.UUID, *, skip: int, limit: int
+    ) -> tuple[MessageStatusSummary, list[GuestMessage]]:
+        if not self._properties.exists(property_id):
+            raise NotFoundError(ErrorCode.PROPERTY_NOT_FOUND, f"Property {property_id} not found")
+        counts = self._messages.count_by_status(property_id)
+        summary = MessageStatusSummary(
+            total=sum(counts.values()),
+            pending=counts.get(MessageStatus.PENDING, 0),
+            classified=counts.get(MessageStatus.CLASSIFIED, 0),
+            responded=counts.get(MessageStatus.RESPONDED, 0),
+            escalated=counts.get(MessageStatus.ESCALATED, 0),
+        )
+        messages = self._messages.list(
+            property_id=property_id, status=None, intent=None, skip=skip, limit=limit
+        )
+        return summary, messages
 
     def classify(self, message_id: uuid.UUID) -> GuestMessage:
         message = self._messages.get(message_id)

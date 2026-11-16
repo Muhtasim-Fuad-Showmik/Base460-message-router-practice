@@ -26,7 +26,7 @@ def list_messages(
     intent: MessageIntent | None = None,
 ) -> list[GuestMessage]:
     """List messages, newest first, filtered by property, status and/or intent."""
-    return service.list(
+    return service.list_messages(
         property_id=property_id,
         status=status,
         intent=intent,

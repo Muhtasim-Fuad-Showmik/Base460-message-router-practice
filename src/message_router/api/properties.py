@@ -2,8 +2,9 @@ import uuid
 
 from fastapi import APIRouter, status
 
-from message_router.api.deps import PaginationDep, PropertyServiceDep
+from message_router.api.deps import MessageServiceDep, PaginationDep, PropertyServiceDep
 from message_router.models import Channel, Property
+from message_router.schemas.message import MessageRead, PropertyMessages
 from message_router.schemas.property import PropertyCreate, PropertyRead
 
 router = APIRouter(prefix="/properties", tags=["properties"])
@@ -27,3 +28,16 @@ def list_properties(
 def get_property(property_id: uuid.UUID, service: PropertyServiceDep) -> Property:
     """Get a single property."""
     return service.get(property_id)
+
+
+@router.get("/{property_id}/messages", response_model=PropertyMessages)
+def list_property_messages(
+    property_id: uuid.UUID, service: MessageServiceDep, pagination: PaginationDep
+) -> PropertyMessages:
+    """A property's messages (newest first, paginated) with a status summary over all of them."""
+    summary, messages = service.list_for_property(
+        property_id, skip=pagination.skip, limit=pagination.limit
+    )
+    return PropertyMessages(
+        summary=summary, messages=[MessageRead.model_validate(m) for m in messages]
+    )

@@ -48,6 +48,12 @@ The assignment lists both 400 and 422; decided (`open-questions.md`): every vali
 - `guest_email` is `EmailStr` (needs `email-validator`); `content` is `Field(min_length=1, max_length=2000)`.
 - JSON field names are the snake_case names in the assignment. Enums serialise as their string values.
 
+## Property message summary
+
+`GET /properties/{id}/messages` returns `{"summary": {"total", "pending", "classified", "responded", "escalated"}, "messages": [...]}`.
+`summary` counts all of the property's messages (one grouped query, zeros filled in); `messages` is the usual
+bounded page (`skip`/`limit`, newest first). Unknown property is 404.
+
 ## Responses
 
 - `response_model=` and `status_code=` on every route decorator; `tags=[...]` per router; docstring = OpenAPI summary.

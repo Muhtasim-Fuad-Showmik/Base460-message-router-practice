@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Collection
 from typing import Any, cast
 
-from sqlalchemy import CursorResult, exists, select, update
+from sqlalchemy import CursorResult, exists, func, select, update
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from message_router.models import GuestMessage, MessageIntent, MessageStatus
@@ -50,6 +50,15 @@ class MessageRepository:
             statement = statement.where(GuestMessage.intent == intent)
         statement = statement.order_by(GuestMessage.created_at.desc(), GuestMessage.id)
         return list(self._session.scalars(statement.offset(skip).limit(limit)))
+
+    def count_by_status(self, property_id: uuid.UUID) -> dict[MessageStatus, int]:
+        """Message counts per status for one property, in a single grouped query."""
+        statement = (
+            select(GuestMessage.status, func.count())
+            .where(GuestMessage.property_id == property_id)
+            .group_by(GuestMessage.status)
+        )
+        return dict(self._session.execute(statement).tuples().all())
 
     def transition(
         self,

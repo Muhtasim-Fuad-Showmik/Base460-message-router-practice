@@ -34,3 +34,20 @@ class MessageRead(BaseModel):
 class MessageDetail(MessageRead):
     property: PropertyRead
     responses: list[AutomatedResponseRead]
+
+
+class MessageStatusSummary(BaseModel):
+    """How many of a property's messages sit in each status."""
+
+    total: int
+    pending: int
+    classified: int
+    responded: int
+    escalated: int
+
+
+class PropertyMessages(BaseModel):
+    """A page of a property's messages plus the status summary over all of them."""
+
+    summary: MessageStatusSummary
+    messages: list[MessageRead]
