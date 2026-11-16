@@ -39,6 +39,7 @@ the schemas — one definition, no duplicated string literals.
 | State machine (guarded transitions) | `services/message_service.py` | Allowed `status` transitions in one table (`pending→classified→responded`, `*→escalated`); each transition is one atomic status-guarded `UPDATE ... WHERE status IN (allowed_from)`; `rowcount == 0` then an `exists` check yields 404 vs 409 (no read-then-check, race-free) |
 | Domain exceptions + central handlers | `core/errors.py` | Services raise `NotFoundError` / `ConflictError`; one handler maps to problem+json |
 | Unit of work (session per request) | `get_db` | One transaction per request; service commits once at the end |
+| Sliding-window rate limiter | `core/rate_limit.py` | Caps message creation per property; plain class injected into `MessageService` via `app.state`, so the service never imports FastAPI and tests pass a fake clock. In-memory and per-process by design |
 | Clock seam | `core/clock.py` | Deterministic timestamps in tests |
 
 ## Considered and rejected (YAGNI for a 2h task)

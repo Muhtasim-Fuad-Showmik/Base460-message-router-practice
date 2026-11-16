@@ -16,6 +16,7 @@ Actions that are not CRUD (`classify`, `respond`, `escalate`) are sub-resource v
 | Schema violation (bad email, content length, bad enum, bad UUID) | 422 (FastAPI/Pydantic default) |
 | Unknown id, unknown `property_id` on message creation | 404 |
 | Invalid state transition (classify twice, respond to escalated) | 409 |
+| More than 10 message creations for one property within a minute | 429 + `Retry-After` |
 
 The assignment lists both 400 and 422; decided (`open-questions.md`): every validation failure is 422, 400 is unused.
 

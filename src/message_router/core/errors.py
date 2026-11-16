@@ -1,3 +1,5 @@
+import math
+from datetime import timedelta
 from enum import StrEnum
 from http import HTTPStatus
 from typing import Any
@@ -19,6 +21,7 @@ class ErrorCode(StrEnum):
     MESSAGE_ALREADY_CLASSIFIED = "MESSAGE_ALREADY_CLASSIFIED"
     MESSAGE_ESCALATED = "MESSAGE_ESCALATED"
     MESSAGE_ALREADY_ESCALATED = "MESSAGE_ALREADY_ESCALATED"
+    RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED"
 
 
 class AppError(Exception):
@@ -30,6 +33,7 @@ class AppError(Exception):
         super().__init__(detail)
         self.code = code
         self.detail = detail
+        self.headers: dict[str, str] = {}
 
 
 class NotFoundError(AppError):
@@ -40,7 +44,21 @@ class ConflictError(AppError):
     status_code = HTTPStatus.CONFLICT
 
 
-def problem_response(status_code: int, code: ErrorCode, detail: str, **extra: Any) -> JSONResponse:
+class RateLimitedError(AppError):
+    status_code = HTTPStatus.TOO_MANY_REQUESTS
+
+    def __init__(self, detail: str, retry_after: timedelta) -> None:
+        super().__init__(ErrorCode.RATE_LIMIT_EXCEEDED, detail)
+        self.headers["Retry-After"] = str(max(1, math.ceil(retry_after.total_seconds())))
+
+
+def problem_response(
+    status_code: int,
+    code: ErrorCode,
+    detail: str,
+    headers: dict[str, str] | None = None,
+    **extra: Any,
+) -> JSONResponse:
     body: dict[str, Any] = {
         "type": "about:blank",
         "title": HTTPStatus(status_code).phrase,
@@ -49,13 +67,13 @@ def problem_response(status_code: int, code: ErrorCode, detail: str, **extra: An
         "code": code,
         **extra,
     }
-    return JSONResponse(body, status_code=status_code, media_type=PROBLEM_JSON)
+    return JSONResponse(body, status_code=status_code, media_type=PROBLEM_JSON, headers=headers)
 
 
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(_: Request, exc: AppError) -> JSONResponse:
-        return problem_response(exc.status_code, exc.code, exc.detail)
+        return problem_response(exc.status_code, exc.code, exc.detail, exc.headers)
 
     @app.exception_handler(RequestValidationError)
     async def handle_validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:

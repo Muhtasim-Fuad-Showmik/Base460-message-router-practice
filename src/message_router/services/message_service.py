@@ -3,7 +3,13 @@ from typing import NoReturn
 
 from sqlalchemy.orm import Session
 
-from message_router.core.errors import ConflictError, ErrorCode, NotFoundError
+from message_router.core.errors import (
+    ConflictError,
+    ErrorCode,
+    NotFoundError,
+    RateLimitedError,
+)
+from message_router.core.rate_limit import SlidingWindowRateLimiter
 from message_router.models import (
     AutomatedResponse,
     GuestMessage,
@@ -26,8 +32,11 @@ DEFAULT_ESCALATION_BODY = (
 
 
 class MessageService:
-    def __init__(self, session: Session) -> None:
+    def __init__(
+        self, session: Session, rate_limiter: SlidingWindowRateLimiter | None = None
+    ) -> None:
         self._session = session
+        self._rate_limiter = rate_limiter
         self._messages = MessageRepository(session)
         self._properties = PropertyRepository(session)
         self._responses = ResponseRepository(session)
@@ -37,6 +46,7 @@ class MessageService:
             raise NotFoundError(
                 ErrorCode.PROPERTY_NOT_FOUND, f"Property {data.property_id} not found"
             )
+        self._enforce_creation_limit(data.property_id)
         message = self._messages.add(GuestMessage(**data.model_dump()))
         self._session.commit()
         return message
@@ -126,6 +136,16 @@ class MessageService:
         )
         self._session.commit()
         return response
+
+    def _enforce_creation_limit(self, property_id: uuid.UUID) -> None:
+        """Per-property cap on message creation; runs after validation and the property check."""
+        if self._rate_limiter is None:
+            return
+        retry_after = self._rate_limiter.acquire(str(property_id))
+        if retry_after is not None:
+            raise RateLimitedError(
+                "Too many messages for this property; try again later", retry_after
+            )
 
     def _apply_transition(
         self,

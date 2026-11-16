@@ -46,8 +46,8 @@ def get_property_service(session: DbSession) -> PropertyService:
 PropertyServiceDep = Annotated[PropertyService, Depends(get_property_service)]
 
 
-def get_message_service(session: DbSession) -> MessageService:
-    return MessageService(session)
+def get_message_service(session: DbSession, request: Request) -> MessageService:
+    return MessageService(session, request.app.state.message_rate_limiter)
 
 
 MessageServiceDep = Annotated[MessageService, Depends(get_message_service)]

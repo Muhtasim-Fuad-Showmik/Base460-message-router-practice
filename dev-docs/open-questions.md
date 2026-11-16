@@ -22,6 +22,8 @@ Decisions are binding; `api-conventions.md`, `architecture.md` and `testing.md` 
 | 14 | Delivery | Local only. README: setup, run, test commands (plus the 422-only note). |
 | 15 | Commits | One conventional commit per slice, no ticket bracket. |
 | 16 | Bonus order | Core first. Then 1) `GET /properties/{id}/messages` summary, 2) rate limit. Classifier unit tests are core. |
+| 17 | Property message summary | `GET /properties/{id}/messages` returns `{summary, messages}`: counts over all of the property's messages (one grouped query) plus the usual paginated, newest-first page. |
+| 18 | Rate limit | At most 10 `POST /messages` per property per rolling minute (`core/config.py`). In-memory sliding window, thread-safe, injected clock; over the limit is 429 `RATE_LIMIT_EXCEEDED` with `Retry-After` (whole seconds, rounded up). Checked after validation and the property-exists check, so 404/422 requests do not use quota; blocked attempts are not recorded. Per-process state: not shared between workers. |
 
 ### Transition table
 
@@ -61,6 +63,4 @@ excludes `escalated`; respond excludes `escalated`).
 
 ## Still open
 
-| # | Question | Leaning |
-|---|---|---|
-| A | Rate limit design (bonus) | In-memory sliding window per `property_id`, thread-safe, injected clock; 429 + `Retry-After`; message creation sits behind an injectable hook so it can be added without touching routers |
+Nothing.

@@ -36,6 +36,8 @@ Integration (`tests/integration`):
 - Escalate: from `pending`/`classified`/`responded` OK; second escalate 409; creates `escalation_notice` with default body, status `escalated`.
 - Every error response matches the problem+json shape.
 
+- Rate limit: unit tests with a fake clock (limit, sliding, retry-after, isolation, thread safety); integration tests for 429 + `Retry-After`, per-property isolation, recovery after the window, and 404/422 not using quota.
+
 ## Rules
 
 - One behaviour per test, named `test_<action>_<condition>_<expected>`.
