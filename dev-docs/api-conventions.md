@@ -41,6 +41,8 @@ The assignment lists both 400 and 422; decided (`open-questions.md`): every vali
 - Naming: `PropertyCreate` / `PropertyRead`; `MessageCreate` / `MessageRead` (list item and classify result) /
   `MessageDetail` (adds `property` and `responses`); `AutomatedResponseCreate` / `AutomatedResponseRead`. Use the
   `Create`/`Read`/`Detail` suffixes everywhere (matches `patterns/schemas.md`).
+- Text inputs are stripped, then must be non-empty; caps: `name` 200, `external_listing_id` 100, `guest_name` 200, `content` 2000, response `body` 2000.
+- `POST /messages/{id}/respond` accepts `response_type` of `ai_generated` or `template` only.
 - Request schemas forbid extra fields (`model_config = ConfigDict(extra="forbid")`) and strip whitespace where it
   makes sense; response schemas use `from_attributes=True`.
 - `guest_email` is `EmailStr` (needs `email-validator`); `content` is `Field(min_length=1, max_length=2000)`.

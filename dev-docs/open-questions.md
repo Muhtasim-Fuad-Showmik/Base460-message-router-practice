@@ -1,20 +1,27 @@
-# Decisions and remaining questions
+# Decision log
 
-Decisions are binding for planning and code; `api-conventions.md` and `testing.md` agree with them.
+Decisions are binding; `api-conventions.md`, `architecture.md` and `testing.md` agree with them.
 
 ## Decided
 
 | # | Topic | Decision |
 |---|---|---|
-| 1 | Sync vs async | **Sync** SQLAlchemy 2.0 (`Session`, stdlib `sqlite3`). Nothing in the brief needs async (no external I/O); sync is simpler to write and test. Relations a response needs are still eager-loaded in the repository (`selectinload`/`joinedload`) to avoid N+1. |
-| 2 | 400 vs 422 | **422 only** for every Pydantic/validation failure (problem+json shape). 400 is not used; say so in the README. |
-| 3 | Classification matching | **Case-insensitive whole-word / whole-phrase** match (`\b` boundaries), first category in the spec's order wins. `early` does not match "nearly", `late` does not match "template". Multi-word keywords (`not working`) match as phrases; `check-in` and `checkin` are separate keywords as listed. |
-| 4 | State transitions | See table below. |
-| 5 | Response to respond/escalate | The created `AutomatedResponse`, 201. |
+| 1 | Sync vs async | **Sync** SQLAlchemy 2.0 (`Session`, stdlib `sqlite3`). No external I/O in scope. Relations a response needs are eager-loaded in the repository (`selectinload`/`joinedload`). |
+| 2 | 400 vs 422 | **422 only** for every validation failure (problem+json). 400 is unused; the README says so. |
+| 3 | Classification matching | Case-insensitive **whole-word** matching with controlled variants — see "Classification matching". |
+| 4 | State transitions | Transition table below, enforced by one atomic status-guarded update (no read-then-check). |
+| 5 | respond/escalate result | The created `AutomatedResponse`, 201. |
 | 6 | Escalation body | Fixed module constant in the service. |
-| 7 | List ordering | `created_at DESC, id`. |
+| 7 | Lists | Plain JSON array; `skip` default 0 (>=0), `limit` default 50 (1..100); order `created_at DESC, id`. |
 | 8 | `GET /messages/{id}` | Nested `property` + `responses` (ordered by `created_at`), eager-loaded. |
-| 9 | Unique `(channel, external_listing_id)` | Not in spec — not added. |
+| 9 | Uniqueness | No `(channel, external_listing_id)` constraint — not in the spec. |
+| 10 | Input strictness | Strip surrounding whitespace, then reject blanks (422) for `guest_name`, `content`, `name`, `external_listing_id`, response `body`. Caps: `name` 200, `external_listing_id` 100, `guest_name` 200, `content` 2000, `body` 2000. |
+| 11 | `/respond` type | Request accepts only `ai_generated` / `template`; `escalation_notice` is 422 and is created only by `/escalate`. |
+| 12 | Database | SQLite, sync; file `message_router.db`, override with `DATABASE_URL`; `create_all` in the app lifespan; `PRAGMA foreign_keys=ON`; busy timeout set. No Alembic. |
+| 13 | Timestamps | Stored UTC, returned timezone-aware (a small `UtcDateTime` `TypeDecorator`, since SQLite drops tzinfo). |
+| 14 | Delivery | Local only. README: setup, run, test commands (plus the 422-only note). |
+| 15 | Commits | One conventional commit per slice, no ticket bracket. |
+| 16 | Bonus order | Core first. Then 1) `GET /properties/{id}/messages` summary, 2) rate limit. Classifier unit tests are core. |
 
 ### Transition table
 
@@ -24,14 +31,36 @@ Decisions are binding for planning and code; `api-conventions.md` and `testing.m
 | respond | → responded | → responded | stays responded (repeat allowed, append-only) | 409 |
 | escalate | → escalated | → escalated | → escalated | 409 |
 
-- Respond does not require classification first (no 409 from `pending`); such a message may end `responded` with
-  `intent = null`, because classify is then a 409. Accepted.
+- Respond does not require classification first; such a message may end `responded` with `intent = null`.
 - `intent` is only ever set by `classify`.
-- A malformed UUID is a 422; a well-formed but unknown `property_id` on message creation is a 404.
+- A malformed UUID is 422; a well-formed unknown `property_id` on message creation is 404.
+
+### Concurrency guard
+
+Each transition is one conditional update driven by the table, never read-then-check:
+
+```sql
+UPDATE guest_messages SET status = :new [, intent = :intent]
+WHERE id = :id AND status IN (:allowed_from)
+```
+
+`rowcount == 1` → insert the response (if any) and commit once. `rowcount == 0` → one `exists` check: missing → 404,
+otherwise → 409. Allowed-from: classify `{pending}`; respond and escalate `{pending, classified, responded}` (escalate
+excludes `escalated`; respond excludes `escalated`).
+
+### Classification matching
+
+- `\b` boundaries, case-insensitive: `early` does not match "nearly", `late` not "template"/"plate", `fix` not "prefix".
+- Multi-word or hyphenated keywords join their tokens with `[\s-]+`: `check-in`, `check in`, `not working`,
+  `not  working`. `checkin` is its own listed keyword.
+- Optional inflection suffix `(?:s|es|ed|ing)?` on the last token (`towels`, `fixed`, `leaking`, `bookings`); the whole
+  word must still end there, so "earlier" and "fixture" do not match.
+- Extra table entries where a suffix cannot derive the form: `key`, `amenity`, `cancelled`, `wi-fi`.
+- First category in the spec's order wins; no match → `other`.
+- No stemming beyond this (e.g. "arrive" does not match `arrival`); pinned in tests.
 
 ## Still open
 
 | # | Question | Leaning |
 |---|---|---|
-| A | Bonus order if time remains | 1) classifier unit tests (do anyway), 2) `/properties/{id}/messages` summary, 3) rate limit |
-| B | Rate limit (if built): in-memory sliding window per `property_id` as a dependency; response 429 + `Retry-After` | Decide only if reached |
+| A | Rate limit design (bonus) | In-memory sliding window per `property_id`, thread-safe, injected clock; 429 + `Retry-After`; message creation sits behind an injectable hook so it can be added without touching routers |

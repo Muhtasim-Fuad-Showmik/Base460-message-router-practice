@@ -20,7 +20,7 @@ integration tests — use a real in-memory SQLite.
 
 Unit (`tests/unit`, no DB):
 - `classify(content)`: one case per intent; case-insensitivity; multi-category → first in the specified order;
-  no match → `other`; the multi-word keywords (`check-in`, `not working`); whole-word behaviour is pinned: `nearly`, `template`,
+  no match → `other`; the multi-word keywords (`check-in`, `not working`); whole-word behaviour is pinned (variants: `towels`, `fixed`, `leaking`, `check in`, `not  working`, `key`, `amenity`, `cancelled`, `wi-fi` match; `arrive` does not): `nearly`, `template`,
   `prefix` do NOT match `early`, `late`, `fix`; `Late!` and `not  working`-style punctuation/case still match.
 - Status transition table: every allowed and every forbidden (from, action) pair.
 
@@ -30,7 +30,9 @@ Integration (`tests/integration`):
   and 2001 chars 422, 2000 chars 201; list filters (`property_id`, `status`, `intent`) and pagination; detail
   includes property and responses.
 - Classify: sets intent + `classified`; second call 409; unknown id 404.
-- Respond: 201, status `responded`; from `pending` allowed; repeat respond allowed (two responses stored); on `escalated` 409; invalid `response_type` 422.
+- Respond: 201, status `responded`; from `pending` allowed; repeat respond allowed (two responses stored); on `escalated` 409; invalid `response_type` 422; `escalation_notice` on `/respond` → 422.
+- Concurrency (file-backed temp DB, two threads): simultaneous escalate of one message → exactly one 201, one 409, one stored response.
+- Input: whitespace-only `content`/`guest_name`/`name`/`body` → 422; surrounding whitespace is stripped; over-cap lengths → 422.
 - Escalate: from `pending`/`classified`/`responded` OK; second escalate 409; creates `escalation_notice` with default body, status `escalated`.
 - Every error response matches the problem+json shape.
 

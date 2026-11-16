@@ -36,7 +36,7 @@ the schemas — one definition, no duplicated string literals.
 | Repository | `repositories/` | Isolates SQLAlchemy queries (filters + pagination) from rules; one place to fix N+1 |
 | DTO / schema separation | `schemas/` vs `models/` | Request, response and persistence shapes evolve independently; `response_model` filters output |
 | Strategy as ordered data | `services/classifier.py` | Classification is an ordered list of `(intent, keywords)` rules; first match wins; adding a rule is a data change, not a code branch. Pure function → trivially unit-tested |
-| State machine (guarded transitions) | `services/message_service.py` | Allowed `status` transitions in one table (`pending→classified→responded`, `*→escalated`); every 409 comes from a single `assert_can(...)` check instead of scattered `if`s |
+| State machine (guarded transitions) | `services/message_service.py` | Allowed `status` transitions in one table (`pending→classified→responded`, `*→escalated`); each transition is one atomic status-guarded `UPDATE ... WHERE status IN (allowed_from)`; `rowcount == 0` then an `exists` check yields 404 vs 409 (no read-then-check, race-free) |
 | Domain exceptions + central handlers | `core/errors.py` | Services raise `NotFoundError` / `ConflictError`; one handler maps to problem+json |
 | Unit of work (session per request) | `get_db` | One transaction per request; service commits once at the end |
 | Clock seam | `core/clock.py` | Deterministic timestamps in tests |
@@ -59,4 +59,5 @@ the schemas — one definition, no duplicated string literals.
 - `AutomatedResponse` has FK to message; `GuestMessage.responses` and `.property` relationships are lazy; the
   detail endpoint eager-loads both (`selectinload`/`joinedload`) to avoid N+1.
 - Index FK columns and the filter columns (`property_id`, `status`, `intent`, `channel`).
-- SQLite does not enforce FKs by default — enable `PRAGMA foreign_keys=ON` on connect.
+- SQLite does not enforce FKs by default — enable `PRAGMA foreign_keys=ON` on connect; set a busy timeout so concurrent writers wait instead of failing.
+- Datetimes: `UtcDateTime` `TypeDecorator` stores UTC and returns timezone-aware values (SQLite drops tzinfo).

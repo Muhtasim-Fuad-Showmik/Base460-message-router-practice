@@ -14,7 +14,8 @@
   accident of a flush elsewhere.
 - Reads are bounded (`offset/limit` always applied) and deterministically ordered (`created_at DESC, id`).
 - Existence checks use `select(exists())`/`session.get`, not loading a list.
-- Enable `PRAGMA foreign_keys=ON` on SQLite connect; index FK + filter columns.
+- State changes use a status-guarded `UPDATE ... WHERE id = :id AND status IN (...)`; check `rowcount`, never read the status first and write after.
+- Enable `PRAGMA foreign_keys=ON` and a busy timeout on SQLite connect; index FK + filter columns.
 - Schema creation is `Base.metadata.create_all(engine)` at startup (lifespan); no Alembic for this project.
 
 ## Review checks
@@ -23,3 +24,4 @@
 - DB-02: no repository call inside a loop over results.
 - DB-03: every list query has limit + order.
 - DB-04: only services call `commit`/`rollback`.
+- DB-05: no status check followed by a separate write; transitions go through the guarded update.
