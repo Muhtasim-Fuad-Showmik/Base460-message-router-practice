@@ -28,6 +28,20 @@ def make_property(client: TestClient, **overrides: Any) -> dict[str, Any]:
     return response.json()  # type: ignore[no-any-return]
 
 
+def make_message(client: TestClient, property_id: str, **overrides: Any) -> dict[str, Any]:
+    """Create a guest message through the API and return its JSON."""
+    payload = {
+        "property_id": property_id,
+        "guest_name": "Ann Guest",
+        "guest_email": "ann@example.com",
+        "content": "Hello, a question about my stay",
+        **overrides,
+    }
+    response = client.post("/messages", json=payload)
+    assert response.status_code == 201, response.text
+    return response.json()  # type: ignore[no-any-return]
+
+
 @pytest.fixture
 def client(app: FastAPI) -> Iterator[TestClient]:
     with TestClient(app) as test_client:  # the context manager runs the lifespan

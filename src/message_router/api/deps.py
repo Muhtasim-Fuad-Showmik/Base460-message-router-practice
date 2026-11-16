@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import Depends, Query, Request
 from sqlalchemy.orm import Session
 
+from message_router.services.message_service import MessageService
 from message_router.services.property_service import PropertyService
 
 DEFAULT_PAGE_SIZE = 50
@@ -43,3 +44,10 @@ def get_property_service(session: DbSession) -> PropertyService:
 
 
 PropertyServiceDep = Annotated[PropertyService, Depends(get_property_service)]
+
+
+def get_message_service(session: DbSession) -> MessageService:
+    return MessageService(session)
+
+
+MessageServiceDep = Annotated[MessageService, Depends(get_message_service)]

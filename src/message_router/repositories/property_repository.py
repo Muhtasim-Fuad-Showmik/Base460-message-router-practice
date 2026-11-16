@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 
 from message_router.models import Channel, Property
@@ -17,6 +17,10 @@ class PropertyRepository:
 
     def get(self, property_id: uuid.UUID) -> Property | None:
         return self._session.get(Property, property_id)
+
+    def exists(self, property_id: uuid.UUID) -> bool:
+        statement = select(exists().where(Property.id == property_id))
+        return bool(self._session.scalar(statement))
 
     def list(self, *, channel: Channel | None, skip: int, limit: int) -> list[Property]:
         statement = select(Property)
